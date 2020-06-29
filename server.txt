@@ -1,0 +1,87 @@
+// ================= 環境 ================= //
+  nginx + gunicorn + flask + GCP
+
+// ================= GCP及flask 設定 =================
+1. 安裝及設定參考：https://hackmd.io/@UcQg6jwlT_WL_ZNkPZMm6Q/BJfELe_c8
+
+
+// ================= nginx 設定 ======================= //
+1. 安裝 nginx
+  sudo apt-get install nginx
+
+2. 設定nginx
+  sudo vi /etc/nginx/sites-available/default
+
+  增加以下內容：
+  ----------------------------------------------
+  server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    
+    ....
+
+    location /api {      
+        proxy_pass http://127.0.0.1:8080/;
+        proxy_set_header Host $host;
+    }
+
+  }
+
+// ================= gunicorn 設定 =================  //
+1. 安裝gunicorn
+  sudo pip3 install gunicro
+
+2. 建立WSGI wsgi.py
+  檔案內容：
+  ------------------wsgi.py----------------------
+  from api import app
+
+  if __name__ == "__main__":
+      app.run()
+
+3. 設定gunicorn的背景服務
+  sudo vi /etc/systemd/system/gunicorn.service
+
+  檔案內容：
+  ----------------gunicorn.service--------------------
+  [Unit]
+  Description=gunicorn daemon
+  After=network.target
+
+  [Service]
+  PIDFile=/run/gunicorn/pid
+  User=<user>
+  Group=www-data
+  RuntimeDirectory=gunicorn
+  WorkingDirectory=/home/<user>/<repository>
+  ExecStart=/usr/local/bin/gunicorn -b 127.0.0.1:8080 wsgi:app --pid /run/gunicorn/pid --access-logfile access.log --log-file server.log --reload
+  ExecReload=/bin/kill -s HUP $MAINPID
+  ExecStop=/bin/kill -s TERM $MAINPID
+  PrivateTmp=true
+
+  [Install]
+  WantedBy=multi-user.target
+  ---------------------------------------------------
+
+4. 將設定檔連結開機啟用
+  sudo systemctl enable gunicorn.service
+
+
+// ================= 常用指定 =================  //
+1. 重新啟動nginx
+  sudo nginx -s reload
+
+2. 手動在背景啟動gunicorn
+  gunicorn --access-logfile access.log --log-file server.log -b 127.0.0.1:8080 wsgi:app -D --reload
+
+3. 停止gunicorn
+  pkill -f -9 gunicorn
+
+4. systemctl status gunicorn.service
+
+5. 重新啟動Server
+  sudo reboot now -h
+
+6. 關機
+  sudo shutdown -h now
+  sudo shutdown -h 21:30 &
